@@ -1,0 +1,48 @@
+---
+title: "Shinny Visualization"
+author: "Ming Zhong mz2692"
+date: "4/26/2019"
+output: html_document
+---
+### UI Design
+Tab 1  
+1. Dsitribution of Application in map by zip code(bar plot abou total application and total approvals)
+2.Give them a chance to select State 
+
+Tab 2  
+1. Barplot about industry and top 10 companies(give thema chance total application or approvals)
+2. Total Application and Approvals in therm of industry
+
+```{r create geodata}
+library(dplyr)
+load("/Users/zhongming/Downloads/final.data.2018.Rdata")
+zip_codes_states <- read.csv("~/Downloads/zip_codes_states.csv")
+zip_codes_states<-zip_codes_states[1:3]
+names(zip_codes_states)[1]="ZIP"
+zip_codes_states$ZIP=as.character(zip_codes_states$ZIP)
+
+#total data without geolocation
+finaldata=left_join(final.data.2018,zip_codes_states,by="ZIP")
+#total clean data
+cleantable <- finaldata %>%
+  select(
+    Employer = Employer,
+    State = State,
+    Zipcode = ZIP,
+    City=City,
+    Total_Approval=Total.Approvals,
+    Total_Application=Total.Applicants,
+    Industry=Industry.Title,
+    Lat = latitude,
+    Long = longitude
+  )
+
+#zipcode total application
+data1<-cleantable%>%group_by(Zipcode,State,City)%>%summarise(Application=sum(Total_Application),Approval=sum(Total_Approval),Lat=mean(Lat),Long=mean(Long))%>%na.omit()
+#total application in industry
+data2<-finaldata%>%group_by(Industry.Title)%>%summarise(Application=sum(Total.Applicants),Approval=sum(Total.Approvals))
+#top 10 application comapny
+#not easy to hash
+
+```
+

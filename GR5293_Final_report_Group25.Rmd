@@ -1,0 +1,524 @@
+---
+title: "Statistical Graphics Final Project"
+author: "Tushar Ponkshe (tvp2110), Ming Zhong (mz2692)"
+date: "April 29, 2019"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+$~$
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE}
+library(tidyverse)
+library(tidyr)
+library(htmltab)
+theme_set(theme_light())
+library(scales)
+library(viridis)
+library(VIM)
+```
+
+___
+
+
+> I. Introduction
+
+The H-1B visa program is the primary method for employers to recruit & hire International professionals and International students to work in the USA. The H-1B visa enables US employers to hire foreign professionals for a specified period of time. The H-1B program allows workers in specialty occupations to work in the US for three years, extendable to six years.
+
+
+As international students studying in the US, we are interested to find work opportunities after graduation and that means going through the H-1B application process. Through this report, we hope to help us and other international students like us make informed decisions about job applications and about selecting industries/companies with high H-1B approvals. Therefore for our analysis, we choose to work with H-1B application data. 
+
+A quick note: Throughout this template we have used color scales from the popular **viridis** package which is robust to colorblindness.
+
+___
+
+$~$
+
+> II. Description of the data source
+
+**Data Collection Methods**
+
+USCIS is responsible for collecting data using a number of electronic systems to capture and store data. As required by the Privacy Act, USCIS publishes System of Record Notices in the Federal Register for each [electronic system](https://www.uscis.gov/tools/reports-studies/immigration-forms-data/understanding-our-data) electronic system that constitutes a "system of records" under the Privacy Act. The DHS Office of Immigration Statistics (OIS) reports Department-wide immigration statistics. OIS uses data from a variety of government sources, including USCIS, to compile their immigration statistics. Generally, USCIS only publishes data from USCIS systems. In cases where OIS and USCIS publish similar statistics, such as on the number of persons obtaining lawful permanent resident status by fiscal year, some variations in data may exist due to a number of factors including reporting dates and standards.
+
+**Data Source**
+
+The data comes directly from the official USCIS website https://www.uscis.gov/h-1b-data-hub.
+
+A screenshot of the source of data is provided below:
+
+![Screenshot 1: H-1B Employer Data Hub](C:\Users\tusha\OneDrive\Documents\Columbia Spring 2019 Courses\Graphics\Final Project\data-collection.PNG)
+
+As seen in the screenshot, the user can imput Employer Name, State, City, ZIP, Fiscal Year, and NAICS code to get most recent H-1B records. For the purpose of our project, we were interested to analyze time series data from 2009-2019 for all employers at all locations which is why we chose not to select anything specific and work with the entire dataset.
+
+Since is dataset is quite large (48.2 MB), we included instructions for downloading the dataset directly from the website in case we can't upload our dataset:
+
+**Instructions**:
+
+- Go to https://www.uscis.gov/h-1b-data-hub
+
+- Click *Search* button at the bottom of the page
+
+- Click the download csv icon right above the data; it should open another page where it will export the dataset and get it ready to download.
+
+
+**Data Description**
+
+- *Format*: We used a .csv format of the dataset. 
+
+- *Types of variables*: Our h1b dataset has three catrgorical variables, namely: Employer, Name, and City; and eight numeric variables, namely: Fiscal.Year, Initial.Approvals, Initial.Denials, Continuing.Approvals, Continuing.Denials, NAICS, Tax.ID, ZIP
+
+- *Number of records*: The dataset has a total of 585744 records.
+
+**Issues with the dataset**
+
+
+- USCIS transferred data from paper forms into the electronic systems manually, data entry errors may occur.
+
+
+- The dataset was too clean with only 1881 missing records, which was about 0.02% of the data. This was why analyzing missing values isn't challenging enough.
+
+
+- ZIP variable had a few 4-digit entries. To fix this, leading zeroes were added.
+
+
+- Data for 2019 has not been updated by USCIS, so we can't include that in our analysis.
+
+
+___
+
+$~$
+
+>III. Description of data import / cleaning / transformation
+
+
+For our analysis, we added the following variables to our dataset:
+
+- Total.Approvals = Initial.Approvals + Comtinuing.Approvals (We can combine these two variables since applicants select either initial application or continuing application when applying for H-1B. Same goes fr denials.)
+ 
+
+- Total.Denials = Initial.Denials + Continuing.Denials 
+
+- Total.Applicants = Total.Approvals + Total.Denials
+
+- Total.Approvals.Percent = Total.Approvals/Total.Applicants
+
+- Total.Denials.Percent= Total.Denials/Total.Applicants
+
+
+and dropped Initial.Approvals, Continuing.Approvals, Initial.Denials, Continuing.Denials, and Tax.ID. Because we only care about companies that sponsor H-1Bs, we never use Tax.ID variable in our analysis. Since Tax.ID had 1,733 missing values, getting rid of it brought down the number of missing records to just 148.
+
+We were also interested to show industries with the highest applicants and approvals, but we couldn't work with their numeric code (NAICS) and needed their actual names so it could be treated as a nominal variable. This data was available on the naics official website https://www.naics.com/search-naics-codes-by-industry/.
+
+To get this dataset into R, we used the **htmltab** library with **htmltab** function that scrapes tabular data from the website into R. This table had the following variables:
+
+- Code (the NAICS code)
+
+- Industry Title
+
+- Number of Business Establishments
+
+
+The number of Business Establishments was not necessary and hence was dropped.
+
+Finally, after some data manipulation, we were able to merge the Industry Title obtained from NAICS dataset with the h1b dataset and dropped the original NAICS variable.
+
+
+
+
+```{r}
+setwd("C:/Users/tusha/OneDrive/Documents/Columbia Spring 2019 Courses/Graphics")
+
+h1b = read.csv("h1b_data_2009_2019.csv")
+
+##Analysis of missing values
+aggr(h1b, numbers = TRUE, prop = c(TRUE, FALSE), col = c('#241360', '#e9ed25'))
+
+h1b$Initial.Approvals = as.numeric(h1b$Initial.Approvals)
+h1b$Continuing.Approvals = as.numeric(h1b$Continuing.Approvals)
+h1b$Initial.Denials = as.numeric(h1b$Initial.Denials)
+h1b$Continuing.Denials = as.numeric(h1b$Continuing.Denials)
+
+h1b$Total.Approvals = h1b$Initial.Approvals + h1b$Continuing.Approvals
+h1b$Total.Denials = h1b$Initial.Denials + h1b$Continuing.Denials
+
+
+h1b$Total.Applicants = h1b$Total.Approvals + h1b$Total.Denials
+
+h1b$Total.Approvals.Percent = h1b$Total.Approvals/h1b$Total.Applicants
+h1b$Total.Denials.Percent = h1b$Total.Denials/h1b$Total.Applicants
+
+h1b$Total.Approvals.Percent = as.numeric(formatC(h1b$Total.Approvals.Percent,digits=2, format="f"))
+h1b$Total.Denials.Percent = as.numeric(formatC(h1b$Total.Denials.Percent,digits=2, format="f"))
+
+drops = c("Initial.Approvals", "Continuing.Approvals", "Initial.Denials", "Continuing.Denials", "Tax.ID")
+
+h1b = h1b[, !(names(h1b) %in% drops)]
+
+```
+
+
+$~$
+
+___
+
+
+>IV. Analysis of missing values
+
+As mentioned in the sections above, one of the problems with our dataset was that it had too few missing values. Here we go over analysis of missing values using our original H-1B dataset.
+
+
+[Aggregation plots](https://www.datacamp.com/community/tutorials/visualize-data-vim-package) are a useful tool for visualizing which variables have missing values and how many. The **aggr** function of the **VIM** package solves this purpose. The following Aggregation plot shows the proportion and count of missing values across variables. 
+
+
+It is clear from the plot in *sectino 3* that missing values appear only in two variables: they constitute about 0.3% of Tax.ID and about 0.025% of ZIP. In the combinations plot on the right-hand side, the grid presents all combinations of missing (yellow) and observed (dark blue) values present in the data. There are 583,865 complete observations, and in only 2 rows both variables are missing.
+
+
+___
+
+
+```{r}
+h1b = na.omit(h1b)
+
+
+url = "https://www.naics.com/search-naics-codes-by-industry/"
+
+naics = htmltab(doc = url, which = "//th[text() = 'Code']/ancestor::table")
+
+drops = "Number of Business Establishments"
+naics = naics[, !(names(naics) %in% drops)]
+naics = naics[-nrow(naics),]
+naics$count = 1
+for (i in 1:dim(naics)[1]) {
+  if (naics[i,1] == "31-33") {
+    naics[i,3] = 3
+  } else if (naics[i,1] == "44-45" | naics[i,1] == "48-49") {
+    naics[i,3] = 2
+  }
+}
+naics = naics[rep(seq_len(dim(naics)[1]), naics$count), ]
+
+naics[5:7,1] = seq(31,33)
+naics[9:10,1] = seq(44,45)
+naics[11:12,1] = seq(48,49)
+
+drops = "count"
+naics = naics[, !(names(naics) %in% drops)]
+names(naics) = c("NAICS", "Industry.Title")
+
+new.dat = merge(h1b, naics, "NAICS")
+new.dat$NAICS = NULL
+final.data = new.dat[order(as.numeric(new.dat$Fiscal.Year)),]
+
+final.data$ZIP = formatC(final.data$ZIP, width = 5, format = "d", flag = "0")
+
+```
+
+
+$~$
+
+___
+
+
+>V. Results
+
+
+
+There are some interesting questions worth exploring with this dataset, such as the change in the number of applicants over time, most popular industries/companies based on the number of applicants, and industries/companies with highest and lowest approvals.
+
+
+We started by filtering our h1b dataset by the Fiscal Year of 2018 because we want to work with the most recent h1b data. From the time series plot, we realized that the number of applicants for 2019 was quite low because the dataset has not been fully updated for this year. (Note that if we use the entire dataset there will be repeated observations and we don't want that; we only need to the entire dataset for the time series plot.) 
+
+
+___
+
+
+**Applicants Over the Past 10 Years**
+
+We choose to analyze the total applicants (instead of total approvals) by industry because we are more interested to show which industries/companies are willing to sponsor H-1B visas; we don't have control over how many of these applications will be approved or denied. Also, we showed only the top 6 industries (with greater than 150,000 applicants) to avoid clutter.
+
+```{r dpi=150, fig.width = 10}
+ts.data.1 = final.data %>%
+  filter(Fiscal.Year != 2019)
+
+ts.data.1.1 <- aggregate(ts.data.1$Total.Applicants, by = list(Industry = ts.data.1$Industry.Title, Year = ts.data.1$Fiscal.Year), FUN=sum)
+
+names(ts.data.1.1) = c("Industry.Title", "Fiscal.Year", "Total.Applicants")
+
+#Applicants > 150000 (Top 5 most popular)
+ts.data.1.1 %>%
+  mutate(Industry.Title = fct_reorder(Industry.Title, Total.Applicants)) %>%
+  filter(Total.Applicants > 150000) %>%
+  ggplot(aes(Fiscal.Year, Total.Applicants)) +
+  geom_line(aes(color = Industry.Title), size = 1) + 
+  guides(color = guide_legend(reverse = TRUE)) +
+  scale_x_continuous(breaks = seq(2009, 2019, 1)) +
+  scale_y_continuous(labels = comma) + 
+  labs(x = "Fiscal Year",
+       y = "Total Applicants",
+       title = "Time Series plot of Number of Applicants by Industry",
+       subtitle = "Number of applicants greater than 150,000") +
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  scale_color_viridis(discrete = T)
+
+```
+
+
+
+From the plot, it is clear that Professional/Scientific/Tech has a significant increase over ten years compared to other popular industries.
+
+
+___
+
+
+**Most Popular Industries in 2018**
+
+
+We realized from an initial plot that the total number of applicants for Professional/Scientific/Tech was the highest, but since it masks the rest of the industries, we decided to drop that from our bar plot to get better visualization.
+
+
+```{r dpi=150}
+
+final.data.2018 = final.data %>%
+  filter(Fiscal.Year == 2018)
+
+final.data %>%
+  filter(Fiscal.Year==2018, Industry.Title != "Professional, Scientific, and Technical Services") %>%
+  count(Industry.Title, wt = Total.Applicants, sort = TRUE) %>%
+  mutate(Industry.Title = fct_reorder(Industry.Title, n)) %>%
+  ggplot(aes(Industry.Title, n, fill = Industry.Title)) +
+  geom_col() +
+  scale_fill_viridis(discrete = T) +
+  scale_y_continuous(labels = comma) +
+  coord_flip() +
+  labs(x = "",
+       y = "Total Applicants",
+       title = "Number of Applicants by Industry") +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+The plot above shows that Manufacturing, Finance and Insurance, and Health Care, Educational Services, and Information are some of the more popular industries.
+
+
+___
+
+
+
+**Most Popular Employers in 2018 (Since there were 54477, we're not going to show them all.)**
+
+
+```{r, fig.width = 10}
+final.data.2018 %>%
+  arrange(desc(Total.Applicants)) %>%
+  head(10) %>%
+  mutate(Employer = str_to_title(Employer), Employer = fct_reorder(Employer, Total.Applicants)) %>%
+  arrange(desc(Total.Applicants)) %>%
+  ggplot(aes(Employer, Total.Applicants, fill = Industry.Title)) +
+  geom_col() +
+  scale_fill_viridis(discrete = T) +
+  labs(x = "", 
+       y = "Total Applicants",
+       title = "Ten Most Popular Employers") +
+  coord_flip() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+This figure shows the 10 most popular employers and their industry. As expected, most top employers belong to Professional/Scientific/Tech or Finance Industries. What's interesting is that one employer (FedEx) from the Transportation industry jumps out to be more popular than what we expect.
+
+
+___
+
+
+
+**Employers with Highest H-1B Approvals**
+
+```{r, fig.width = 10}
+final.data.2018 = final.data %>%
+  filter(Fiscal.Year==2018)
+final.data %>%
+  arrange(desc(Total.Approvals)) %>%
+  select(Employer, Total.Approvals, Industry.Title) %>%
+  head(20) %>%
+  mutate(Employer = str_to_title(Employer), Employer = fct_reorder(Employer, Total.Approvals)) %>%
+  ggplot(aes(Employer, Total.Approvals, color = Industry.Title)) +
+  geom_point() +
+  scale_color_viridis(discrete = T) +
+  coord_flip() +
+  labs(x = "",
+       y = "Total Approvals",
+       title = "Employers With Highest H-1B Approvals") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+In this plot we show 20 employers with the highest number of approvals. What's interesting about this plot is that it shows how many employers in the education services industry seem to have a high number of approvals, even higher than some of the employers in Professional/Scientific/Tech services.
+
+
+
+___
+
+
+
+**H1B Approval Rate by Industry**
+
+```{r}
+final.data.2018.1 = final.data %>%
+  filter(Fiscal.Year==2018)
+
+final.data.2018.1 %>%
+  group_by(Industry.Title) %>%
+  summarize(Total.Approvals.Percent = mean(Total.Approvals.Percent)) %>%
+  mutate(Industry.Title = fct_reorder(Industry.Title, Total.Approvals.Percent)) %>%
+  ggplot(aes(Industry.Title, Total.Approvals.Percent, fill = Industry.Title)) +
+  geom_col() +
+  scale_y_continuous(labels = percent) +
+  scale_fill_viridis(discrete = T) +
+  coord_flip() +
+  labs(x = "",
+       y = "Approval Rate",
+       title = "H1B Approval Rate by Industry") +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+This plot shows the average approval rate by industry. As seen from the plot in the previous section, it is interesting that Educational Services have such a high approval rate.
+
+
+___
+
+
+
+**Short summary of most revealing findings**
+
+There has been a significant increase in the number of H-1B applications since 2009, with most immigrants choosing to work in Professional/Technical Services, Manufacturing, Education, Finance, Healthcare, and information. This is expected given the advancement in technology that has extensive use in all such industries.
+
+We see that while individuals continue to work at finance and tech companies with hopes of getting their H-1Bs approved, educational institutes such as University of Chicago, Emory and Yale universities have some of the highest H-1B approval rates.
+
+
+
+$~$
+
+___
+
+
+>VI Interactive Component
+
+
+We built the interactive part using R Shiny and published it using [Rshinnyapps.io](https://mingzhong.shinyapps.io/H1BViz/)
+
+In order to visualize the H-1B data geographically, we merge the zip code geolocation dataset with H-1B dataset. The zip code to geolocation file can be found [here](https://gist.github.com/erichurst/7882666/).
+
+
+___
+
+
+**Questions**
+
+
+The interactive component is designed to answer the following three question:
+
+
+- Which areas are more likely to get H-1B approvals?
+
+- Which industries are more likely to get H-1B approvals?
+
+- Which company shall I apply for if I want to get an H-1B?
+
+
+___
+
+
+**Instruction of Shiny App**
+
+
+Here is an instruction about how to use our Shiny App to answer the questions mentioned above.
+
+
+
+
+![ Interactive Map UI(1)](C:\Users\tusha\OneDrive\Documents\Columbia Spring 2019 Courses\Graphics\Final Project\shiny_app_screenshot_1.PNG)
+
+
+___
+
+
+
+To answer the first question, we design an interactive map for the user to search the H-1B application number by zip codes and state names. Users can even filter data by the total number of H1B selections. All the search and filter functions can be achieve using the widgets.
+
+
+And after input the zip code in the search box, the map will automatically zoom in and show the details about H-1B application in that area. 
+
+
+___
+
+
+
+![Interactive Map UI(2)](C:\Users\tusha\OneDrive\Documents\Columbia Spring 2019 Courses\Graphics\Final Project\shiny_app_screenshot_2.PNG)
+
+
+___
+
+
+To answer the next two questions, we design two kinds of charts to show the top 10 companies based on H-1B applications within each industry. Users can select the industry using the dropdown menu next to the graph.
+
+___
+
+
+![Interactive Dashboard UI(1)](C:\Users\tusha\OneDrive\Documents\Columbia Spring 2019 Courses\Graphics\Final Project\shiny_app_screenshot_3.PNG)
+
+
+___
+
+
+Besides, the second graph shows the total number of H-1B applications in every industry and their proportions.
+
+
+___
+
+
+
+![Interactive Dashboard UI(2)](C:\Users\tusha\OneDrive\Documents\Columbia Spring 2019 Courses\Graphics\Final Project\shiny_app_screenshot_4.PNG)
+
+
+
+___
+
+
+
+![Interactive Dashboard UI(3)](C:\Users\tusha\OneDrive\Documents\Columbia Spring 2019 Courses\Graphics\Final Project\shiny_app_screenshot_5.PNG)
+
+
+$~$
+
+___
+
+
+>VII Conclusion
+
+
+**Limitations**
+
+There were a few limitations to our project. First, for the H1B data, we only classified them in terms of industries and locations. That limits our aspects in exploring the dataset. Second, we did not visualize the data in terms of companies location. Third, for the Shiny App, we only visualize the data in 2018.
+
+
+**Future Directions**
+
+In the future, we may find other sources of data that classified H1B applications in terms of job positions and industries. That can provide a good indication about which company is currently expanding and what kind of job I should look for. Second, by using google map API, we can get the geolocation of every company and then show them in our Shiny App. Third, after the US government updating the data, we can update our visualization in 2019. Furthermore, there might be another way to combine H1B into company level. Using H1B application data as an indicator to predict whether the company is expanding or not and compare our prediction with companies' financial statement.
+
+
+**Lessons Learned**
+
+*Ming*: I learned how to build and deploy my Shiny App in cloud. Besides, I explored different map format and refined my user interface with css file. I found out how to combine leaflet api and mapbox api together with building the interactive map.
+
+*Turshar*: I learned that using dplyr library is more useful and faster compared to conventional methods of data cleaning. Also, we should have spent more time in selecting the dataset we want to work with because the one that we used was too clean. And finally I learned that making the graphs presentation ready takes a lot of attention to detail, which we ignore while creating graphs just for the purpose of EDA.
+
+___
